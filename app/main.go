@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -23,7 +25,28 @@ func main() {
 	}
 	defer conn.Close()
 
-	_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	requestLine, err := bufio.NewReader(conn).ReadString('\n')
+	if err != nil {
+		fmt.Println("Error reading request: ", err.Error())
+		os.Exit(1)
+	}
+
+	// Request line format: METHOD PATH HTTP/1.1
+	parts := strings.Fields(requestLine)
+	if len(parts) < 2 {
+		fmt.Println("Malformed request line: ", requestLine)
+		os.Exit(1)
+	}
+	path := parts[1]
+
+	var response string
+	if path == "/" {
+		response = "HTTP/1.1 200 OK\r\n\r\n"
+	} else {
+		response = "HTTP/1.1 404 Not Found\r\n\r\n"
+	}
+
+	_, err = conn.Write([]byte(response))
 	if err != nil {
 		fmt.Println("Error writing response: ", err.Error())
 		os.Exit(1)
