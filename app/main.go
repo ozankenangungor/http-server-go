@@ -40,9 +40,16 @@ func main() {
 	path := parts[1]
 
 	var response string
-	if path == "/" {
+	switch {
+	case path == "/":
 		response = "HTTP/1.1 200 OK\r\n\r\n"
-	} else {
+	case strings.HasPrefix(path, "/echo/"):
+		body := strings.TrimPrefix(path, "/echo/")
+		response = fmt.Sprintf(
+			"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
+			len(body), body,
+		)
+	default:
 		response = "HTTP/1.1 404 Not Found\r\n\r\n"
 	}
 
