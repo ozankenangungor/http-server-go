@@ -25,13 +25,14 @@ func main() {
 	}
 	defer conn.Close()
 
-	requestLine, err := bufio.NewReader(conn).ReadString('\n')
+	reader := bufio.NewReader(conn)
+
+	// Request line format: METHOD PATH HTTP/1.1
+	requestLine, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("Error reading request: ", err.Error())
 		os.Exit(1)
 	}
-
-	// Request line format: METHOD PATH HTTP/1.1
 	parts := strings.Fields(requestLine)
 	if len(parts) < 2 {
 		fmt.Println("Malformed request line: ", requestLine)
@@ -39,16 +40,21 @@ func main() {
 	}
 	path := parts[1]
 
+	headers, err := readHeaders(reader)
+	if err != nil {
+		fmt.Println("Error reading headers: ", err.Error())
+		os.Exit(1)
+	}
+
 	var response string
 	switch {
 	case path == "/":
 		response = "HTTP/1.1 200 OK\r\n\r\n"
 	case strings.HasPrefix(path, "/echo/"):
 		body := strings.TrimPrefix(path, "/echo/")
-		response = fmt.Sprintf(
-			"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
-			len(body), body,
-		)
+		response = textResponse(body)
+	case path == "/user-agent":
+		response = textResponse(headers["user-agent"])
 	default:
 		response = "HTTP/1.1 404 Not Found\r\n\r\n"
 	}
@@ -58,4 +64,35 @@ func main() {
 		fmt.Println("Error writing response: ", err.Error())
 		os.Exit(1)
 	}
+}
+
+// readHeaders reads HTTP headers until the blank line that ends the header
+// section. Header names are stored lowercased, since header names are
+// case-insensitive.
+func readHeaders(reader *bufio.Reader) (map[string]string, error) {
+	headers := make(map[string]string)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, err
+		}
+		line = strings.TrimRight(line, "\r\n")
+		if line == "" {
+			break
+		}
+		key, value, found := strings.Cut(line, ":")
+		if !found {
+			continue
+		}
+		headers[strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(value)
+	}
+	return headers, nil
+}
+
+// textResponse builds a 200 OK response with a text/plain body.
+func textResponse(body string) string {
+	return fmt.Sprintf(
+		"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
+		len(body), body,
+	)
 }
