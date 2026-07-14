@@ -2,15 +2,20 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
+
+	directory := flag.String("directory", "", "directory to serve files from")
+	flag.Parse()
 
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
@@ -25,14 +30,14 @@ func main() {
 			continue
 		}
 
-		go handleConnection(conn)
+		go handleConnection(conn, *directory)
 	}
 }
 
 // handleConnection reads a single HTTP request from conn and writes the
 // matching response. Each connection is handled independently so the
 // server can serve multiple clients concurrently.
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, directory string) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
@@ -65,6 +70,9 @@ func handleConnection(conn net.Conn) {
 		response = textResponse(body)
 	case path == "/user-agent":
 		response = textResponse(headers["user-agent"])
+	case strings.HasPrefix(path, "/files/"):
+		filename := strings.TrimPrefix(path, "/files/")
+		response = fileResponse(directory, filename)
 	default:
 		response = "HTTP/1.1 404 Not Found\r\n\r\n"
 	}
@@ -104,4 +112,24 @@ func textResponse(body string) string {
 		"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s",
 		len(body), body,
 	)
+}
+
+// fileResponse reads the given filename from directory and returns a 200 OK
+// response with the file contents as an octet-stream, or a 404 response if
+// the file doesn't exist.
+func fileResponse(directory, filename string) string {
+	if directory == "" {
+		return "HTTP/1.1 404 Not Found\r\n\r\n"
+	}
+
+	content, err := os.ReadFile(filepath.Join(directory, filename))
+	if err != nil {
+		return "HTTP/1.1 404 Not Found\r\n\r\n"
+	}
+
+	header := fmt.Sprintf(
+		"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n",
+		len(content),
+	)
+	return header + string(content)
 }
