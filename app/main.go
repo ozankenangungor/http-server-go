@@ -18,11 +18,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			continue
+		}
+
+		go handleConnection(conn)
 	}
+}
+
+// handleConnection reads a single HTTP request from conn and writes the
+// matching response. Each connection is handled independently so the
+// server can serve multiple clients concurrently.
+func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
@@ -31,19 +41,19 @@ func main() {
 	requestLine, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("Error reading request: ", err.Error())
-		os.Exit(1)
+		return
 	}
 	parts := strings.Fields(requestLine)
 	if len(parts) < 2 {
 		fmt.Println("Malformed request line: ", requestLine)
-		os.Exit(1)
+		return
 	}
 	path := parts[1]
 
 	headers, err := readHeaders(reader)
 	if err != nil {
 		fmt.Println("Error reading headers: ", err.Error())
-		os.Exit(1)
+		return
 	}
 
 	var response string
@@ -62,7 +72,6 @@ func main() {
 	_, err = conn.Write([]byte(response))
 	if err != nil {
 		fmt.Println("Error writing response: ", err.Error())
-		os.Exit(1)
 	}
 }
 
