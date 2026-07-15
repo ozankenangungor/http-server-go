@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -53,6 +55,7 @@ func handleConnection(conn net.Conn, directory string) {
 		fmt.Println("Malformed request line: ", requestLine)
 		return
 	}
+	method := parts[0]
 	path := parts[1]
 
 	headers, err := readHeaders(reader)
@@ -70,6 +73,9 @@ func handleConnection(conn net.Conn, directory string) {
 		response = textResponse(body)
 	case path == "/user-agent":
 		response = textResponse(headers["user-agent"])
+	case method == "POST" && strings.HasPrefix(path, "/files/"):
+		filename := strings.TrimPrefix(path, "/files/")
+		response = saveFileResponse(reader, headers, directory, filename)
 	case strings.HasPrefix(path, "/files/"):
 		filename := strings.TrimPrefix(path, "/files/")
 		response = fileResponse(directory, filename)
@@ -132,4 +138,32 @@ func fileResponse(directory, filename string) string {
 		len(content),
 	)
 	return header + string(content)
+}
+
+// saveFileResponse reads the request body (sized by the Content-Length
+// header) and writes it to filename inside directory, returning a 201
+// response on success or a 404 if there's no directory configured.
+func saveFileResponse(reader *bufio.Reader, headers map[string]string, directory, filename string) string {
+	if directory == "" {
+		return "HTTP/1.1 404 Not Found\r\n\r\n"
+	}
+
+	contentLength, err := strconv.Atoi(headers["content-length"])
+	if err != nil {
+		fmt.Println("Invalid Content-Length: ", err.Error())
+		return "HTTP/1.1 400 Bad Request\r\n\r\n"
+	}
+
+	body := make([]byte, contentLength)
+	if _, err := io.ReadFull(reader, body); err != nil {
+		fmt.Println("Error reading request body: ", err.Error())
+		return "HTTP/1.1 400 Bad Request\r\n\r\n"
+	}
+
+	if err := os.WriteFile(filepath.Join(directory, filename), body, 0644); err != nil {
+		fmt.Println("Error writing file: ", err.Error())
+		return "HTTP/1.1 500 Internal Server Error\r\n\r\n"
+	}
+
+	return "HTTP/1.1 201 Created\r\n\r\n"
 }
