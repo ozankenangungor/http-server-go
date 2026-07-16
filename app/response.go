@@ -19,18 +19,28 @@ func textResponse(body string) string {
 }
 
 // echoResponse builds the response for the /echo/{str} endpoint. If the
-// client's Accept-Encoding header includes a scheme we support, a matching
-// Content-Encoding header is added to the response.
+// client's Accept-Encoding header includes a scheme we support, the body is
+// compressed with that scheme and a matching Content-Encoding header is
+// added to the response.
 func echoResponse(body, acceptEncoding string) string {
 	encoding := negotiateEncoding(acceptEncoding)
 	if encoding == "" {
 		return textResponse(body)
 	}
 
-	return fmt.Sprintf(
-		"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: %s\r\nContent-Length: %d\r\n\r\n%s",
-		encoding, len(body), body,
+	// negotiateEncoding only ever returns schemes we support, and gzip is
+	// currently the only one, so this is the sole case for now.
+	compressed, err := gzipCompress([]byte(body))
+	if err != nil {
+		fmt.Println("Error compressing body: ", err.Error())
+		return textResponse(body)
+	}
+
+	header := fmt.Sprintf(
+		"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: %s\r\nContent-Length: %d\r\n\r\n",
+		encoding, len(compressed),
 	)
+	return header + string(compressed)
 }
 
 // octetStreamResponse builds a 200 OK response with an

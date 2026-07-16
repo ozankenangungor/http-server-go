@@ -1,6 +1,10 @@
 package main
 
-import "strings"
+import (
+	"bytes"
+	"compress/gzip"
+	"strings"
+)
 
 // supportedEncodings lists the compression schemes this server can produce,
 // in order of preference.
@@ -19,4 +23,19 @@ func negotiateEncoding(acceptEncoding string) string {
 		}
 	}
 	return ""
+}
+
+// gzipCompress compresses data using gzip and returns the compressed bytes.
+func gzipCompress(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+
+	writer := gzip.NewWriter(&buf)
+	if _, err := writer.Write(data); err != nil {
+		return nil, err
+	}
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }
