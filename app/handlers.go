@@ -19,7 +19,8 @@ func routeRequest(req *Request, reader *bufio.Reader, directory string) string {
 	case req.Path == "/":
 		return statusOK
 	case strings.HasPrefix(req.Path, "/echo/"):
-		return textResponse(strings.TrimPrefix(req.Path, "/echo/"))
+		body := strings.TrimPrefix(req.Path, "/echo/")
+		return echoResponse(body, req.Headers["accept-encoding"])
 	case req.Path == "/user-agent":
 		return textResponse(req.Headers["user-agent"])
 	case req.Method == "POST" && strings.HasPrefix(req.Path, "/files/"):

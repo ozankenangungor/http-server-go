@@ -18,6 +18,21 @@ func textResponse(body string) string {
 	)
 }
 
+// echoResponse builds the response for the /echo/{str} endpoint. If the
+// client's Accept-Encoding header includes a scheme we support, a matching
+// Content-Encoding header is added to the response.
+func echoResponse(body, acceptEncoding string) string {
+	encoding := negotiateEncoding(acceptEncoding)
+	if encoding == "" {
+		return textResponse(body)
+	}
+
+	return fmt.Sprintf(
+		"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: %s\r\nContent-Length: %d\r\n\r\n%s",
+		encoding, len(body), body,
+	)
+}
+
 // octetStreamResponse builds a 200 OK response with an
 // application/octet-stream body, used for serving raw file contents.
 func octetStreamResponse(content []byte) string {
