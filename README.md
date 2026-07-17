@@ -1,37 +1,40 @@
-[![progress-banner](https://backend.codecrafters.io/progress/http-server/f6780105-25ae-47cd-b933-b4477727c2d5)](https://app.codecrafters.io/users/ozankenangungor?r=2qF)
+# HTTP Server (Go)
 
-This is a starting point for Go solutions to the
-["Build Your Own HTTP server" Challenge](https://app.codecrafters.io/courses/http-server/overview).
+This is my solution to CodeCrafters' "Build Your Own HTTP Server" challenge, written in Go.
 
-[HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) is the
-protocol that powers the web. In this challenge, you'll build a HTTP/1.1 server
-that is capable of serving multiple clients.
+The idea is simple but you learn a lot from it: instead of reaching for Go's `net/http`, you build an HTTP/1.1 server from scratch on raw TCP sockets. You parse the request line yourself, read headers by hand, handle the body based on `Content-Length`, and write the response bytes back manually. No shortcuts.
 
-Along the way you'll learn about TCP servers,
-[HTTP request syntax](https://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html),
-and more.
+I wanted to actually understand what's happening underneath all the abstractions I use every day instead of just calling `http.ListenAndServe` and moving on.
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+![demo](demo.gif)
 
-# Passing the first stage
+## What it supports
 
-The entry point for your HTTP server implementation is in `app/main.go`. Study
-and uncomment the relevant code, and then run the command below to execute the
-tests on our servers:
+- Binding to a TCP port and accepting connections
+- Basic routing (`/`, `/echo/{str}`, `/user-agent`, `/files/{filename}`)
+- Reading and writing files through `/files/{filename}` (GET to read, POST to write), with the directory configurable via a `--directory` flag
+- Handling multiple clients concurrently, one goroutine per connection
+- Gzip compression negotiated through `Accept-Encoding` / `Content-Encoding`
+- Persistent (keep-alive) connections, and closing them properly when the client sends `Connection: close`
+
+## Project structure
+
+Everything lives in `app/`, split by responsibility instead of one giant file:
+
+- `main.go` – entry point, listener setup, the per-connection loop
+- `request.go` – parses the request line and headers
+- `response.go` – builds responses (status line, headers, body)
+- `handlers.go` – routes requests to the right logic
+- `compression.go` – negotiates a compression scheme and gzips the body when needed
+
+## Running it
 
 ```sh
-codecrafters submit
+./your_program.sh --directory /tmp/
 ```
 
-Time to move on to the next stage!
+Then hit it with curl:
 
-# Stage 2 & beyond
-
-Note: This section is for stages 2 and beyond.
-
-1. Ensure you have `go (1.26)` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `app/main.go`.
-1. Run `codecrafters submit` to submit your solution to CodeCrafters. Test
-   output will be streamed to your terminal.
+```sh
+curl http://localhost:4221/echo/hello
+```
