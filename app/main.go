@@ -53,14 +53,15 @@ func handleConnection(conn net.Conn, directory string) {
 			return
 		}
 
-		response := routeRequest(req, reader, directory)
+		closeConnection := strings.EqualFold(req.Headers["connection"], "close")
+		response := routeRequest(req, reader, directory, closeConnection)
 
 		if _, err := conn.Write([]byte(response)); err != nil {
 			fmt.Println("Error writing response: ", err.Error())
 			return
 		}
 
-		if strings.EqualFold(req.Headers["connection"], "close") {
+		if closeConnection {
 			return
 		}
 	}
